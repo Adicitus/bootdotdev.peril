@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/adicitus/bootdotdev.peril/internal/gamelogic"
 	"github.com/adicitus/bootdotdev.peril/internal/pubsub"
 	"github.com/adicitus/bootdotdev.peril/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -34,15 +36,40 @@ func main() {
 		os.Exit(1)
 	}
 
-	pubsub.PublishJSON(msgCh, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
-		IsPaused: true,
-	})
-
 	sigCh := make(chan os.Signal, 1)
 
 	signal.Notify(sigCh, syscall.SIGTERM)
 	signal.Notify(sigCh, syscall.SIGHUP)
 	signal.Notify(sigCh, syscall.SIGINT)
+
+	gamelogic.PrintServerHelp()
+GameLoop:
+	for {
+		input := gamelogic.GetInput()
+
+		if len(input) == 0 {
+			time.Sleep(time.Millisecond * 5)
+			continue
+		}
+
+		switch input[0] {
+		case "pause":
+			fmt.Println("Sending pause message")
+			pubsub.PublishJSON(msgCh, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+				IsPaused: true,
+			})
+		case "resume":
+			fmt.Println("Sending resume message")
+			pubsub.PublishJSON(msgCh, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+				IsPaused: false,
+			})
+		case "quit":
+			fmt.Println("Server shutting down...")
+			break GameLoop
+		default:
+			fmt.Printf("Unrecognized command: %s\n", input[0])
+		}
+	}
 
 	s := <-sigCh
 
