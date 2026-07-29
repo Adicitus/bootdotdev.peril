@@ -3,8 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
+	"time"
 
 	"github.com/adicitus/bootdotdev.peril/internal/gamelogic"
 	"github.com/adicitus/bootdotdev.peril/internal/pubsub"
@@ -37,13 +36,48 @@ func main() {
 		fmt.Printf("Failed to register a message queue: %s\n", err.Error())
 	}
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM)
-	signal.Notify(sigCh, syscall.SIGHUP)
-	signal.Notify(sigCh, syscall.SIGINT)
+	state := gamelogic.NewGameState(username)
 
-	s := <-sigCh
+GameLoop:
+	for {
+		input := gamelogic.GetInput()
 
-	fmt.Printf("Signal received: %s\n", s)
+		if len(input) == 0 {
+			time.Sleep(time.Millisecond * 5)
+			continue
+		}
+
+		switch input[0] {
+		case "spawn":
+			err = state.CommandSpawn(input)
+			if err != nil {
+				fmt.Printf("An error occurred: %s\n", err.Error())
+			}
+
+		case "move":
+			move, err := state.CommandMove(input)
+
+			if err != nil {
+				fmt.Printf("An error occurred: %s\n", err.Error())
+				continue
+			}
+
+			fmt.Printf("Move %d to %s", len(move.Units), move.ToLocation)
+
+		case "status":
+			state.CommandStatus()
+
+		case "help":
+			gamelogic.PrintClientHelp()
+
+		case "spam":
+			fmt.Println("Spamming not allowed yet")
+
+		case "quit":
+			gamelogic.PrintQuit()
+			break GameLoop
+		}
+	}
+
 	fmt.Println("Client stopped.")
 }
