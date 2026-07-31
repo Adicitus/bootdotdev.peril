@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/adicitus/bootdotdev.peril/internal/gamelogic"
@@ -36,12 +34,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	sigCh := make(chan os.Signal, 1)
-
-	signal.Notify(sigCh, syscall.SIGTERM)
-	signal.Notify(sigCh, syscall.SIGHUP)
-	signal.Notify(sigCh, syscall.SIGINT)
-
 	gamelogic.PrintServerHelp()
 GameLoop:
 	for {
@@ -70,10 +62,5 @@ GameLoop:
 			fmt.Printf("Unrecognized command: %s\n", input[0])
 		}
 	}
-
-	s := <-sigCh
-
-	fmt.Printf("\nSignal received: %s\n", s)
-
 	fmt.Println("Server stopped")
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/adicitus/bootdotdev.peril/internal/gamelogic"
 	"github.com/adicitus/bootdotdev.peril/internal/pubsub"
+	"github.com/adicitus/bootdotdev.peril/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -30,13 +31,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, _, err = pubsub.RegisterQueue(conn, "peril_direct", fmt.Sprintf("pause.%s", username), "pause")
+	state := gamelogic.NewGameState(username)
+
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%s", username), routing.PauseKey, handlerPause(*state))
 
 	if err != nil {
-		fmt.Printf("Failed to register a message queue: %s\n", err.Error())
+		fmt.Printf("Failed to subscibe for pause messages: %s\n", err.Error())
+		os.Exit(1)
 	}
-
-	state := gamelogic.NewGameState(username)
 
 GameLoop:
 	for {
@@ -80,4 +82,12 @@ GameLoop:
 	}
 
 	fmt.Println("Client stopped.")
+}
+
+func handlerPause(state gamelogic.GameState) func(routing.PlayingState) {
+	return func(ps routing.PlayingState) {
+		fmt.Println("Handling pause")
+		defer fmt.Print("> ")
+		state.HandlePause(ps)
+	}
 }
