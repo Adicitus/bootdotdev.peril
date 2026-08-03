@@ -24,6 +24,13 @@ func main() {
 
 	defer conn.Close()
 
+	pubCh, err := conn.Channel()
+
+	if err != nil {
+		fmt.Printf("Failed to establish a channel for message publishing: %s\n", err.Error())
+		os.Exit(1)
+	}
+
 	username, err := gamelogic.ClientWelcome()
 
 	if err != nil {
@@ -33,10 +40,17 @@ func main() {
 
 	state := gamelogic.NewGameState(username)
 
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%s", username), routing.PauseKey, handlerPause(*state))
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%s", username), routing.PauseKey, handlerPause(state))
 
 	if err != nil {
 		fmt.Printf("Failed to subscibe for pause messages: %s\n", err.Error())
+		os.Exit(1)
+	}
+
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%s", username), "army_moves.*", handlerArmyMove(state))
+
+	if err != nil {
+		fmt.Printf("Failed to subscibe for army moves messages: %s\n", err.Error())
 		os.Exit(1)
 	}
 
@@ -64,7 +78,9 @@ GameLoop:
 				continue
 			}
 
-			fmt.Printf("Move %d to %s", len(move.Units), move.ToLocation)
+			pubsub.PublishJSON(pubCh, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%s", username), move)
+
+			fmt.Printf("Published move %d to %s\n", len(move.Units), move.ToLocation)
 
 		case "status":
 			state.CommandStatus()
@@ -84,10 +100,18 @@ GameLoop:
 	fmt.Println("Client stopped.")
 }
 
-func handlerPause(state gamelogic.GameState) func(routing.PlayingState) {
+func handlerPause(state *gamelogic.GameState) func(routing.PlayingState) {
 	return func(ps routing.PlayingState) {
-		fmt.Println("Handling pause")
+		fmt.Println("Handling pause...")
 		defer fmt.Print("> ")
 		state.HandlePause(ps)
+	}
+}
+
+func handlerArmyMove(state *gamelogic.GameState) func(gamelogic.ArmyMove) {
+	return func(move gamelogic.ArmyMove) {
+		fmt.Println("Handling move...")
+		state.HandleMove(move)
+		fmt.Print("> ")
 	}
 }
