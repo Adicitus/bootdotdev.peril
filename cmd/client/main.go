@@ -100,18 +100,26 @@ GameLoop:
 	fmt.Println("Client stopped.")
 }
 
-func handlerPause(state *gamelogic.GameState) func(routing.PlayingState) {
-	return func(ps routing.PlayingState) {
+func handlerPause(state *gamelogic.GameState) func(routing.PlayingState) (bool, bool) {
+	return func(ps routing.PlayingState) (ack, requeue bool) {
 		fmt.Println("Handling pause...")
 		defer fmt.Print("> ")
 		state.HandlePause(ps)
+		return true, false
 	}
 }
 
-func handlerArmyMove(state *gamelogic.GameState) func(gamelogic.ArmyMove) {
-	return func(move gamelogic.ArmyMove) {
+func handlerArmyMove(state *gamelogic.GameState) func(gamelogic.ArmyMove) (bool, bool) {
+	return func(move gamelogic.ArmyMove) (ack, requeue bool) {
 		fmt.Println("Handling move...")
-		state.HandleMove(move)
+		outcome := state.HandleMove(move)
 		fmt.Print("> ")
+
+		switch outcome {
+		case gamelogic.MoveOutComeSafe, gamelogic.MoveOutcomeMakeWar:
+			return true, false
+		default:
+			return false, false
+		}
 	}
 }

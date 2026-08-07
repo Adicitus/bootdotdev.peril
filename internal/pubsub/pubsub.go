@@ -31,7 +31,7 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	return nil
 }
 
-func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string, handler func(T)) error {
+func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string, handler func(T) (ack, requeue bool)) error {
 
 	msgCh, _, err := RegisterQueue(conn, exchange, queuename, key)
 
@@ -44,6 +44,8 @@ func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string
 	go func() {
 		for delivery := range subCh {
 
+			fmt.Printf("Handling %s...\n", delivery.CorrelationId)
+
 			var msg T
 			err := json.Unmarshal(delivery.Body, &msg)
 
@@ -52,9 +54,15 @@ func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string
 				continue
 			}
 
-			delivery.Ack(false)
+			ack, requeue := handler(msg)
 
-			handler(msg)
+			if ack {
+				fmt.Printf("Ack %s\n", delivery.CorrelationId)
+				delivery.Ack(false)
+			} else {
+				fmt.Printf("Nack %s\n", delivery.CorrelationId)
+				delivery.Nack(false, requeue)
+			}
 		}
 	}()
 
