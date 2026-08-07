@@ -76,7 +76,9 @@ func RegisterQueue(conn *amqp.Connection, exchange, queuename, key string) (*amq
 		return nil, amqp.Queue{}, err
 	}
 
-	queue, err := msgCh.QueueDeclare(queuename, false, true, true, false, nil)
+	queue, err := msgCh.QueueDeclare(queuename, false, true, true, false, amqp.Table{
+		"x-dead-letter-exchange": "peril_dlx",
+	})
 
 	if err != nil {
 		msgCh.Close()
