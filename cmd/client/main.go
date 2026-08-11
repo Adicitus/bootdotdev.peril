@@ -40,17 +40,24 @@ func main() {
 
 	state := gamelogic.NewGameState(username)
 
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%s", username), routing.PauseKey, handlerPause(state))
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%s", username), routing.PauseKey, false, true, handlerPause(state))
 
 	if err != nil {
 		fmt.Printf("Failed to subscibe for pause messages: %s\n", err.Error())
 		os.Exit(1)
 	}
 
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%s", username), "army_moves.*", handlerArmyMove(state))
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%s", username), "army_moves.*", false, true, handlerArmyMove(state, pubCh))
 
 	if err != nil {
 		fmt.Printf("Failed to subscibe for army moves messages: %s\n", err.Error())
+		os.Exit(1)
+	}
+
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, routing.WarRecognitionsPrefix, fmt.Sprintf("%s.*", routing.WarRecognitionsPrefix), true, false, handlerWarRecognition(state))
+
+	if err != nil {
+		fmt.Printf("Failed to subscibe for war messages: %s\n", err.Error())
 		os.Exit(1)
 	}
 
@@ -109,16 +116,46 @@ func handlerPause(state *gamelogic.GameState) func(routing.PlayingState) (bool, 
 	}
 }
 
-func handlerArmyMove(state *gamelogic.GameState) func(gamelogic.ArmyMove) (bool, bool) {
+func handlerArmyMove(state *gamelogic.GameState, pubCh *amqp.Channel) func(gamelogic.ArmyMove) (bool, bool) {
 	return func(move gamelogic.ArmyMove) (ack, requeue bool) {
 		fmt.Println("Handling move...")
 		outcome := state.HandleMove(move)
 		fmt.Print("> ")
 
 		switch outcome {
-		case gamelogic.MoveOutComeSafe, gamelogic.MoveOutcomeMakeWar:
+		case gamelogic.MoveOutComeSafe:
+			return true, false
+		case gamelogic.MoveOutcomeMakeWar:
+			pubsub.PublishJSON(pubCh, routing.ExchangePerilTopic, fmt.Sprintf("%s.%s", routing.WarRecognitionsPrefix, state.Player.Username), gamelogic.RecognitionOfWar{
+				Attacker: move.Player,
+				Defender: state.GetPlayerSnap(),
+			})
+			return false, true
+		default:
+			return false, false
+		}
+	}
+}
+
+func handlerWarRecognition(state *gamelogic.GameState) func(gamelogic.RecognitionOfWar) (bool, bool) {
+	return func(row gamelogic.RecognitionOfWar) (bool, bool) {
+		defer fmt.Print("> ")
+
+		outcome, _, _ := state.HandleWar(row)
+
+		switch outcome {
+		case gamelogic.WarOutcomeNotInvolved:
+			return false, true
+		case gamelogic.WarOutcomeNoUnits:
+			return false, false
+		case gamelogic.WarOutcomeOpponentWon:
+			return true, false
+		case gamelogic.WarOutcomeYouWon:
+			return true, false
+		case gamelogic.WarOutcomeDraw:
 			return true, false
 		default:
+			fmt.Printf("Unexpected war outcome: %v\n", outcome)
 			return false, false
 		}
 	}

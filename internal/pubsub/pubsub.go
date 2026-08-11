@@ -31,9 +31,9 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	return nil
 }
 
-func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string, handler func(T) (ack, requeue bool)) error {
+func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string, durable, exclusive bool, handler func(T) (ack, requeue bool)) error {
 
-	msgCh, _, err := RegisterQueue(conn, exchange, queuename, key)
+	msgCh, _, err := RegisterQueue(conn, exchange, queuename, key, durable, exclusive)
 
 	if err != nil {
 		return err
@@ -69,14 +69,14 @@ func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string
 	return nil
 }
 
-func RegisterQueue(conn *amqp.Connection, exchange, queuename, key string) (*amqp.Channel, amqp.Queue, error) {
+func RegisterQueue(conn *amqp.Connection, exchange, queuename, key string, durable, exclusive bool) (*amqp.Channel, amqp.Queue, error) {
 	msgCh, err := conn.Channel()
 
 	if err != nil {
 		return nil, amqp.Queue{}, err
 	}
 
-	queue, err := msgCh.QueueDeclare(queuename, false, true, true, false, amqp.Table{
+	queue, err := msgCh.QueueDeclare(queuename, durable, true, exclusive, false, amqp.Table{
 		"x-dead-letter-exchange": "peril_dlx",
 	})
 
