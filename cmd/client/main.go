@@ -126,11 +126,15 @@ func handlerArmyMove(state *gamelogic.GameState, pubCh *amqp.Channel) func(gamel
 		case gamelogic.MoveOutComeSafe:
 			return true, false
 		case gamelogic.MoveOutcomeMakeWar:
-			pubsub.PublishJSON(pubCh, routing.ExchangePerilTopic, fmt.Sprintf("%s.%s", routing.WarRecognitionsPrefix, state.Player.Username), gamelogic.RecognitionOfWar{
+			err := pubsub.PublishJSON(pubCh, routing.ExchangePerilTopic, fmt.Sprintf("%s.%s", routing.WarRecognitionsPrefix, state.Player.Username), gamelogic.RecognitionOfWar{
 				Attacker: move.Player,
 				Defender: state.GetPlayerSnap(),
 			})
-			return false, true
+
+			if err != nil {
+				return false, true
+			}
+			return true, false
 		default:
 			return false, false
 		}
