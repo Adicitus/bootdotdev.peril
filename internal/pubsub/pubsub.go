@@ -44,8 +44,6 @@ func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string
 	go func() {
 		for delivery := range subCh {
 
-			fmt.Printf("Handling %s...\n", delivery.CorrelationId)
-
 			var msg T
 			err := json.Unmarshal(delivery.Body, &msg)
 
@@ -57,10 +55,8 @@ func SubscribeJSON[T any](conn *amqp.Connection, exchange, queuename, key string
 			ack, requeue := handler(msg)
 
 			if ack {
-				fmt.Printf("Ack %s\n", delivery.CorrelationId)
 				delivery.Ack(false)
 			} else {
-				fmt.Printf("Nack %s\n", delivery.CorrelationId)
 				delivery.Nack(false, requeue)
 			}
 		}

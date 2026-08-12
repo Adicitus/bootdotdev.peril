@@ -25,14 +25,16 @@ func PrintClientHelp() {
 	fmt.Println("* help")
 }
 
-func ClientWelcome() (string, error) {
+func ClientWelcome(username string) (string, error) {
 	fmt.Println("Welcome to the Peril client!")
-	fmt.Println("Please enter your username:")
-	words := GetInput()
-	if len(words) == 0 {
-		return "", errors.New("you must enter a username. goodbye")
+	if username == "" {
+		fmt.Println("Please enter your username:")
+		words := GetInput("")
+		if len(words) == 0 {
+			return "", errors.New("you must enter a username. goodbye")
+		}
+		username = words[0]
 	}
-	username := words[0]
 	fmt.Printf("Welcome, %s!\n", username)
 	PrintClientHelp()
 	return username, nil
@@ -46,8 +48,8 @@ func PrintServerHelp() {
 	fmt.Println("* help")
 }
 
-func GetInput() []string {
-	fmt.Print("> ")
+func GetInput(prompt string) []string {
+	fmt.Printf("%s > ", prompt)
 	scanner := bufio.NewScanner(os.Stdin)
 	scanned := scanner.Scan()
 	if !scanned {

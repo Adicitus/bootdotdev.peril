@@ -37,7 +37,7 @@ func main() {
 	gamelogic.PrintServerHelp()
 GameLoop:
 	for {
-		input := gamelogic.GetInput()
+		input := gamelogic.GetInput("Peril server")
 
 		if len(input) == 0 {
 			time.Sleep(time.Millisecond * 5)

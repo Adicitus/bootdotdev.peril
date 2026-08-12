@@ -31,11 +31,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	username, err := gamelogic.ClientWelcome()
+	username := ""
 
-	if err != nil {
-		fmt.Printf("Failed to display greeting: %s\n", err.Error())
-		os.Exit(1)
+	if len(os.Args) > 1 {
+		username = os.Args[1]
+		gamelogic.ClientWelcome(username)
+	} else {
+		username, err = gamelogic.ClientWelcome("")
+
+		if err != nil {
+			fmt.Printf("Failed to display greeting: %s\n", err.Error())
+			os.Exit(1)
+		}
 	}
 
 	state := gamelogic.NewGameState(username)
@@ -63,7 +70,7 @@ func main() {
 
 GameLoop:
 	for {
-		input := gamelogic.GetInput()
+		input := gamelogic.GetInput(username)
 
 		if len(input) == 0 {
 			time.Sleep(time.Millisecond * 5)
@@ -110,7 +117,7 @@ GameLoop:
 func handlerPause(state *gamelogic.GameState) func(routing.PlayingState) (bool, bool) {
 	return func(ps routing.PlayingState) (ack, requeue bool) {
 		fmt.Println("Handling pause...")
-		defer fmt.Print("> ")
+		defer fmt.Printf("%s > ", state.GetUsername())
 		state.HandlePause(ps)
 		return true, false
 	}
@@ -120,7 +127,7 @@ func handlerArmyMove(state *gamelogic.GameState, pubCh *amqp.Channel) func(gamel
 	return func(move gamelogic.ArmyMove) (ack, requeue bool) {
 		fmt.Println("Handling move...")
 		outcome := state.HandleMove(move)
-		fmt.Print("> ")
+		fmt.Printf("%s > ", state.GetUsername())
 
 		switch outcome {
 		case gamelogic.MoveOutComeSafe:
@@ -143,7 +150,7 @@ func handlerArmyMove(state *gamelogic.GameState, pubCh *amqp.Channel) func(gamel
 
 func handlerWarRecognition(state *gamelogic.GameState) func(gamelogic.RecognitionOfWar) (bool, bool) {
 	return func(row gamelogic.RecognitionOfWar) (bool, bool) {
-		defer fmt.Print("> ")
+		defer fmt.Printf("%s > ", state.GetUsername())
 
 		outcome, _, _ := state.HandleWar(row)
 
